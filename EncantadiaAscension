@@ -1,0 +1,42 @@
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/liebertsx/Tora-Library/main/src/librarynew"))()
+local tab = library:CreateWindow("Encantadia Ascension")
+
+local RS = game:GetService("ReplicatedStorage")
+local CharactersFolder = RS:WaitForChild("Characters")
+local SpawnRemote = RS:WaitForChild("RemoteEvents"):WaitForChild("Spawn")
+
+local selectedChar = nil
+
+local function getCharList()
+    local list = {}
+    for _, char in pairs(CharactersFolder:GetChildren()) do
+        table.insert(list, char.Name)
+    end
+    table.sort(list)
+    return list
+end
+
+tab:AddList({
+    text = "Select Character",
+    values = getCharList(),
+    callback = function(value)
+        selectedChar = value
+    end
+})
+
+tab:AddButton({
+    text = "Deploy",
+    callback = function()
+        if selectedChar then
+            local charObj = CharactersFolder:FindFirstChild(selectedChar)
+            if charObj then
+                local args = {
+                    charObj
+                }
+                SpawnRemote:FireServer(unpack(args))
+            end
+        end
+    end
+})
+
+library:Init()

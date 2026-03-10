@@ -1,15 +1,19 @@
 local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/liebertsx/Tora-Library/main/src/librarynew"))()
 local tab = library:CreateWindow("Encantadia Ascension")
 
+local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
-local CharactersFolder = RS:WaitForChild("Characters")
-local RemoteEvents = RS:WaitForChild("RemoteEvents")
-local SpawnRemote = RemoteEvents:WaitForChild("Spawn")
-local LocalPlayer = game:GetService("Players").LocalPlayer
+local LocalPlayer = Players.LocalPlayer
 local Camera = game:GetService("Workspace").CurrentCamera
 local StarterGui = game:GetService("StarterGui")
 
+local CharactersFolder = RS:WaitForChild("Characters")
+local RemoteEvents = RS:WaitForChild("RemoteEvents")
+local SpawnRemote = RemoteEvents:WaitForChild("Spawn")
+
 local selectedChar = nil
+local targetPlayer = ""
+_G.ESP_Enabled = false
 
 local function getCharList()
     local list = {}
@@ -20,7 +24,9 @@ local function getCharList()
     return list
 end
 
-tab:AddList({
+local charFolder = tab:AddFolder("Character")
+
+charFolder:AddList({
     text = "Select Character",
     values = getCharList(),
     callback = function(value)
@@ -28,36 +34,28 @@ tab:AddList({
     end
 })
 
-tab:AddButton({
+charFolder:AddButton({
     text = "Deploy",
     callback = function()
         if selectedChar then
             local charObj = CharactersFolder:FindFirstChild(selectedChar)
             if charObj then
                 SpawnRemote:FireServer(charObj)
-                
                 task.spawn(function()
                     local newChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
                     local humanoid = newChar:WaitForChild("Humanoid", 10)
-                    
                     if humanoid then
                         task.wait(0.5)
                         Camera.CameraType = Enum.CameraType.Custom
                         Camera.CameraSubject = humanoid
                     end
-                    
                     local playerGui = LocalPlayer:WaitForChild("PlayerGui")
                     local selector = playerGui:FindFirstChild("CharacterSelectorGui")
-                    if selector then
-                        selector.Enabled = false
-                    end
-                    
+                    if selector then selector.Enabled = false end
                     StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
                     StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Hotbar, false)
-                    
                     StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, true)
                     StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, true)
-                    
                     StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
                     StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Hotbar, false)
                 end)
@@ -65,5 +63,75 @@ tab:AddButton({
         end
     end
 })
+
+local tpFolder = tab:AddFolder("Teleport")
+
+tpFolder:AddBox({
+    text = "Player Name",
+    callback = function(value) targetPlayer = value end
+})
+
+tpFolder:AddButton({
+    text = "Teleport",
+    callback = function()
+        if targetPlayer == "" then return end
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and (string.find(p.Name:lower(), targetPlayer:lower()) or string.find(p.DisplayName:lower(), targetPlayer:lower())) then
+                local myChar = LocalPlayer.Character
+                local targetChar = p.Character
+                if myChar and targetChar and myChar:FindFirstChild("HumanoidRootPart") and targetChar:FindFirstChild("HumanoidRootPart") then
+                    myChar.HumanoidRootPart.CFrame = targetChar.HumanoidRootPart.CFrame
+                    break
+                end
+            end
+        end
+    end
+})
+
+tpFolder:AddToggle({
+    text = "ESP",
+    callback = function(value) _G.ESP_Enabled = value end
+})
+
+local function CreateESP(p)
+    local function SetupESP()
+        task.spawn(function()
+            local character = p.Character or p.CharacterAdded:Wait()
+            local hrp = character:WaitForChild("HumanoidRootPart", 10)
+            local hum = character:WaitForChild("Humanoid", 10)
+            while p.Character == character and task.wait(0.3) do
+                if not _G.ESP_Enabled then 
+                    if hrp and hrp:FindFirstChild("ESPGui") then hrp.ESPGui:Destroy() end
+                    continue 
+                end
+                if p ~= LocalPlayer and hrp and hum and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    local bgui = hrp:FindFirstChild("ESPGui")
+                    if not bgui then
+                        bgui = Instance.new("BillboardGui", hrp)
+                        bgui.Name = "ESPGui"
+                        bgui.AlwaysOnTop = true
+                        bgui.Size = UDim2.new(0, 200, 0, 50)
+                        bgui.ExtentsOffset = Vector3.new(0, 3, 0)
+                        local tl = Instance.new("TextLabel", bgui)
+                        tl.Name = "InfoLabel"
+                        tl.BackgroundTransparency = 1
+                        tl.Size = UDim2.new(1, 0, 1, 0)
+                        tl.TextColor3 = Color3.fromRGB(235, 52, 158)
+                        tl.TextStrokeTransparency = 0
+                        tl.Font = Enum.Font.GothamBold
+                        tl.TextSize = 14
+                    end
+                    local dist = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - hrp.Position).Magnitude)
+                    bgui.InfoLabel.Text = p.DisplayName.."\nHP: "..math.floor(hum.Health).."\n["..dist.." Studs]"
+                end
+            end
+        end)
+    end
+    SetupESP()
+    p.CharacterAdded:Connect(SetupESP)
+end
+
+for _, p in pairs(Players:GetPlayers()) do CreateESP(p) end
+Players.PlayerAdded:Connect(function(p) CreateESP(p) end)
 
 library:Init()
